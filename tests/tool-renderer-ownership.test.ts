@@ -214,6 +214,12 @@ test("MCP detection, titles, details, and custom tools use the global wrapper", 
 	);
 	assert.equal(isMcpToolDefinition({ description: "not an MCP tool" }, "remote"), false);
 	assert.equal(humanizeMcpToolName("mcp__filesystem__read_file"), "Filesystem Read File");
+	// pi-mcp-adapter labels its tools "MCP", "MCP Script" and "MCP: <server>".
+	assert.equal(isMcpToolDefinition({ label: "MCP Script" }, "mcpScript"), true);
+	assert.equal(isMcpToolDefinition({ label: "MCP" }, "mcp"), true);
+	assert.equal(humanizeMcpToolName("mcpScript", "MCP Script"), "MCP Script");
+	assert.equal(humanizeMcpToolName("mcp__github", "MCP: github"), "Github");
+	assert.equal(humanizeMcpToolName("mcp"), "MCP");
 
 	const events = new Map<string, Function>();
 	claudeCodeStyleExtension(

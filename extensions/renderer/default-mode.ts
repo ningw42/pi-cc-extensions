@@ -36,7 +36,7 @@ import { showMoreHintText } from "./tool/show-more-hint.ts";
 import { countWriteDiffStats } from "./tool/diff/diff-renderer.ts";
 import { renderRichToolResult, type WriteExecutionMetadataStore } from "./tool/diff/index.ts";
 import { getMessageDisplayTheme } from "./tool/message-display.ts";
-import { fitToolCallSummary, humanizeToolLabel, toolCallSummary } from "./tool/names.ts";
+import { fitToolCallSummary, resolveToolTitle, toolCallSummary } from "./tool/names.ts";
 
 // 成功勾：亮绿 truecolor（与 message-display 一致）
 const BRIGHT_GREEN = "\x1b[38;2;80;220;100m";
@@ -102,24 +102,8 @@ export function shouldRenderRichDiff(
 	return mode === "on" && !isError && (toolName === "edit" || toolName === "write");
 }
 
-export function isMcpToolDefinition(definition: any, toolName: string): boolean {
-	const label = typeof definition?.label === "string" ? definition.label.trim() : "";
-	if (/^MCP(?::|$)/i.test(label)) return true;
-	if (toolName === "mcp" || /^mcp[_:-]|[_:-]mcp[_:-]/i.test(toolName)) return true;
-	if (label) return false;
-	const description = typeof definition?.description === "string" ? definition.description : "";
-	return /\bModel Context Protocol\b/i.test(description);
-}
-
-export function humanizeMcpToolName(toolName: string): string {
-	const words = toolName
-		.replace(/^mcp(?:[_:-]+)+/i, "")
-		.split(/[_:-]+/)
-		.filter(Boolean);
-	return words.length
-		? words.map((word) => word[0]!.toUpperCase() + word.slice(1)).join(" ")
-		: "MCP";
-}
+// MCP 标题解析收敛在 names.ts（单工具卡与分组卡共用）；此处保留导出路径不变。
+export { humanizeMcpToolName, isMcpToolDefinition, resolveToolTitle } from "./tool/names.ts";
 
 /** 排除名单内且自带 renderer 的工具保留原渲染。 */
 export function preservesOriginalRenderer(
@@ -225,9 +209,6 @@ function createCcstyleTool(
 	writeExecutionMetadata: WriteExecutionMetadataStore,
 ): any {
 	const toolName = originalTool.name;
-	const label = isMcpToolDefinition(originalTool, toolName)
-		? humanizeMcpToolName(toolName)
-		: originalTool.label || toolName;
 
 	return {
 		...originalTool,
@@ -248,7 +229,8 @@ function createCcstyleTool(
 					? `${BRIGHT_GREEN}${rawIcon}${ANSI_FG_RESET}`
 					: theme.fg(toolIconColor(context), rawIcon);
 			const summary = toolCallSummary(toolName, args, {
-				title: label === toolName ? humanizeToolLabel(label) : label,
+				// args 参与解析：mcp 网关的标题取自实际执行目标的 server。
+				title: resolveToolTitle(originalTool, toolName, args),
 				variant: "default",
 				cwd: context?.cwd,
 			});

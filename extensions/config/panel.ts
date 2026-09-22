@@ -588,6 +588,13 @@ export async function showCcstylePanel(
 			"Aliases disabled.",
 			config.enableAliases,
 		);
+		const mcpServerGuessToggle = featureToggleSetting(
+			"enableMcpServerGuess",
+			"MCP server guess",
+			"mcp gateway calls show the target server (github, exa, ...).",
+			"mcp gateway calls always show plain MCP.",
+			config.enableMcpServerGuess,
+		);
 		const footerNerdIconsSetting = {
 			id: "footerNerdIcons",
 			label: "Nerd Font icons",
@@ -634,6 +641,7 @@ export async function showCcstylePanel(
 			enableAgentSummary: agentSummaryToggle,
 			enableWorkingMessage: workingMessageToggle,
 			enableAliases: aliasesToggle,
+			enableMcpServerGuess: mcpServerGuessToggle,
 		};
 
 		const onSettingChange = (id: string, value: string) => {
@@ -818,6 +826,7 @@ export async function showCcstylePanel(
 					agentSummaryToggle.setting,
 					workingMessageToggle.setting,
 					aliasesToggle.setting,
+					mcpServerGuessToggle.setting,
 				],
 			},
 			{

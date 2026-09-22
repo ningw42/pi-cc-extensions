@@ -69,6 +69,7 @@ export type Config = {
 	enableAgentSummary: boolean;
 	enableWorkingMessage: boolean;
 	enableAliases: boolean;
+	enableMcpServerGuess: boolean;
 	enableCustomFooter: boolean;
 	footerNerdIcons: boolean;
 	footerHiddenKeys: string[];
@@ -137,6 +138,11 @@ export const DEFAULT_CONFIG: Config = {
 	enableAgentSummary: true,
 	enableWorkingMessage: true,
 	enableAliases: true,
+	/**
+	 * pi-mcp-adapter 的 `mcp` 网关调用标题是否推断执行目标的 server。
+	 * 关闭后网关一律显示 "MCP"；`mcp__<server>` 代理工具不受影响。
+	 */
+	enableMcpServerGuess: true,
 	enableCustomFooter: true,
 	footerNerdIcons: true,
 	...DEFAULT_FOOTER_CHIP_LAYOUT,
@@ -238,6 +244,7 @@ export function normalizeConfig(input: unknown): Config {
 		enableAgentSummary: source.enableAgentSummary !== false,
 		enableWorkingMessage: source.enableWorkingMessage !== false,
 		enableAliases: source.enableAliases !== false,
+		enableMcpServerGuess: source.enableMcpServerGuess !== false,
 		enableCustomFooter: source.enableCustomFooter !== false,
 		footerNerdIcons: source.footerNerdIcons !== false,
 		...normalizeFooterChipLayout(source),
@@ -294,6 +301,7 @@ export function formatConfigStatus(source: Config = config): string {
 		`agentSummary=${source.enableAgentSummary ? "on" : "off"}`,
 		`workingMsg=${source.enableWorkingMessage ? "on" : "off"}`,
 		`aliases=${source.enableAliases ? "on" : "off"}`,
+		`mcpGuess=${source.enableMcpServerGuess ? "on" : "off"}`,
 		`footer=${source.enableCustomFooter ? "on" : "off"}`,
 		`footerIcons=${source.footerNerdIcons ? "nerd" : "plain"}`,
 		formatFooterChipSummary(source),

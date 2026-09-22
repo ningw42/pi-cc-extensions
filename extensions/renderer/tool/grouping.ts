@@ -12,7 +12,7 @@ import { stripAnsi, stripBackgroundAnsi, stripLeadingStatusIcon } from "../../ut
 import { walkComponentTree } from "../../utils/component-tree.ts";
 import {
 	fitToolCallSummary,
-	humanizeToolLabel,
+	resolveToolTitle,
 	toolCallSummary,
 	type ToolCallSummary,
 } from "./names.ts";
@@ -148,10 +148,24 @@ export function paddedBackgroundRow(
 }
 
 function toolSummary(tool: any): ToolCallSummary {
-	return toolCallSummary(toolName(tool), tool?.args ?? {}, {
+	const name = toolName(tool);
+	const args = tool?.args ?? {};
+	return toolCallSummary(name, args, {
+		// 与单工具卡共用标题解析，否则 mcp__github 在组里会退化成 "Mcp Github"。
+		title: resolveToolTitle(tool?.toolDefinition ?? tool?.builtInToolDefinition, name, args),
 		variant: "grouping",
 		cwd: tool?.cwd,
 	});
+}
+
+/** 单一工具名分组的头部标题：与子行、单工具卡使用同一套解析。 */
+function groupHeaderLabel(tool: any): string {
+	const name = toolName(tool);
+	return resolveToolTitle(
+		tool?.toolDefinition ?? tool?.builtInToolDefinition,
+		name,
+		tool?.args ?? {},
+	);
 }
 
 function toolNameList(tools: any[]): string {
@@ -326,8 +340,7 @@ export class ToolGroupComponent extends Container {
 			})
 			.join(` ${fg("dim", "•")} `);
 		const names = new Set(this.children.map(toolName));
-		const label =
-			names.size === 1 ? humanizeToolLabel(toolName(this.children[0])) : "Multiple Tools";
+		const label = names.size === 1 ? groupHeaderLabel(this.children[0]) : "Multiple Tools";
 		const overall: ToolStatus = counts.error ? "error" : counts.pending ? "pending" : "success";
 		if (
 			(this.children as any[]).some((tool) => tool?.executionStarted && status(tool) === "pending")

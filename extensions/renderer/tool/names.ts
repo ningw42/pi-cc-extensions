@@ -18,6 +18,91 @@ export function humanizeToolLabel(label: string): string {
 		.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+/**
+ * 已知 MCP server 名池。pi-mcp-adapter 的 formatToolName 把 server 前缀拼进 tool 名
+ * （`${server}_${tool}`），这里做它的逆运算。ccstyle 读不到 mcp.json，因此改为在渲染
+ * 过程中从 `args.server` 和 `mcp__<server>` 工具名里学习。
+ */
+const mcpServerNames = new Set<string>();
+
+/** 分隔符归一：配置里写 brave-search，模型常写成 brave_search。 */
+function normalizeServerToken(value: string): string {
+	return value.toLowerCase().replace(/-/g, "_");
+}
+
+/** 测试与 /reload 用：清空已学习的 server 名。 */
+export function resetMcpServerNames(): void {
+	mcpServerNames.clear();
+}
+
+/** 从一次调用里学习 server 名，供后续缺少 server 参数的网关调用反查。 */
+function learnMcpServerNames(toolName: string, args: unknown): void {
+	const proxied = toolName.match(/^mcp[_:-]+(.+)$/i);
+	if (proxied?.[1]) mcpServerNames.add(proxied[1]);
+	const server = (args as any)?.server;
+	if (typeof server === "string" && server) mcpServerNames.add(server);
+}
+
+/**
+ * 取匹配最长的已知 server 前缀。没有匹配时返回 undefined —— 不退回“首段即 server”，
+ * 否则 `get_file_contents` 这类无前缀调用会被渲染成并不存在的 server "Get"。
+ */
+function serverFromMcpToolName(toolName: string): string | undefined {
+	const target = normalizeServerToken(toolName);
+	let best: string | undefined;
+	for (const server of mcpServerNames) {
+		const prefix = normalizeServerToken(server);
+		if (target.startsWith(`${prefix}_`) && (!best || server.length > best.length)) best = server;
+	}
+	return best;
+}
+
+/** `mcp` 网关：标题取实际执行目标的 server 名；config.enableMcpServerGuess 关闭时恒为 "MCP"。 */
+function mcpGatewayTitle(args: unknown): string {
+	if (!config.enableMcpServerGuess || !args || typeof args !== "object") return "MCP";
+	const source = args as Record<string, unknown>;
+	const server = typeof source.server === "string" && source.server ? source.server : "";
+	const tool = typeof source.tool === "string" ? source.tool : "";
+	const resolved = tool ? server || serverFromMcpToolName(tool) : server;
+	return resolved ? humanizeToolLabel(resolved) : "MCP";
+}
+
+export function isMcpToolDefinition(definition: any, toolName: string): boolean {
+	const label = typeof definition?.label === "string" ? definition.label.trim() : "";
+	// `\b` 而非 `(?::|$)`：pi-mcp-adapter 的 mcpScript 标签是 "MCP Script"。
+	if (/^MCP\b/i.test(label)) return true;
+	if (toolName === "mcp" || /^mcp[_:-]|[_:-]mcp[_:-]/i.test(toolName)) return true;
+	if (label) return false;
+	const description = typeof definition?.description === "string" ? definition.description : "";
+	return /\bModel Context Protocol\b/i.test(description);
+}
+
+/** MCP 工具标题：优先用扩展自带的 label，其次从工具名推导。 */
+export function humanizeMcpToolName(toolName: string, label = ""): string {
+	const trimmed = String(label).trim();
+	// "MCP: github" -> Github（namespace proxy / direct tool）
+	const scoped = trimmed.match(/^MCP\s*:\s*(.+)$/i);
+	if (scoped?.[1]) return humanizeToolLabel(scoped[1]);
+	// "MCP Script" -> 原样保留扩展提供的大小写
+	if (/^MCP\s+\S/i.test(trimmed)) return trimmed;
+	const rest = toolName.replace(/^mcp(?:[_:-]+)+/i, "");
+	if (!rest || /^mcp$/i.test(rest)) return "MCP";
+	return humanizeToolLabel(rest);
+}
+
+/**
+ * 单工具卡与分组卡共用的标题解析：两条路径必须得到逐字相同的结果。
+ * 分组卡此前只有 humanizeToolLabel(toolName)，会把 mcp__github 渲染成 "Mcp Github"。
+ */
+export function resolveToolTitle(definition: any, toolName: string, args?: unknown): string {
+	learnMcpServerNames(toolName, args);
+	if (toolName === "mcp") return mcpGatewayTitle(args);
+	if (isMcpToolDefinition(definition, toolName))
+		return humanizeMcpToolName(toolName, definition?.label);
+	const label = definition?.label || toolName;
+	return label === toolName ? humanizeToolLabel(label) : label;
+}
+
 const AGENT_FAMILY_TOOL_NAMES = new Set([
 	"Agent",
 	"Agents",
