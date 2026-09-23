@@ -549,8 +549,8 @@ export async function showCcstylePanel(
 		const mcpGatewayServerNameToggle = featureToggleSetting(
 			"enableMcpGatewayServerName",
 			"MCP gateway server name",
-			"mcp gateway calls show the target server (github, exa, ...).",
-			"mcp gateway calls always show plain MCP.",
+			"MCP gateway calls show the target server (github, exa, etc.).",
+			"MCP gateway calls always show plain 'MCP'.",
 			config.enableMcpGatewayServerName,
 		);
 
