@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { posix, win32 } from "node:path";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { config } from "../../config/config.ts";
@@ -19,11 +20,51 @@ export function humanizeToolLabel(label: string): string {
 }
 
 /**
- * Pool of known MCP server names. pi-mcp-adapter's formatToolName prepends the server to the
- * tool name (`${server}_${tool}`); this reverses that. ccstyle cannot read mcp.json, so the
- * names are learned during rendering from `args.server` and `mcp__<server>` tool names.
+ * Pool of known MCP server names, used to recover pi-mcp-adapter's default server prefixes.
+ * ccstyle cannot read mcp.json: learn from successful gateway results and verified namespace
+ * definitions encountered by ccstyle rendering, not from arbitrary MCP-looking call names.
  */
 const mcpServerNames = new Set<string>();
+let mcpServerNamesRevision = 0;
+
+function rememberMcpServer(server: string): void {
+	if (mcpServerNames.has(server)) return;
+	mcpServerNames.add(server);
+	mcpServerNamesRevision++;
+}
+
+/** Cache dependency for gateway titles; learning cannot change titles while the flag is off. */
+export function mcpGatewayTitleRevision(): number {
+	return config.enableMcpGatewayServerName ? mcpServerNamesRevision : -1;
+}
+
+/** pi-mcp-adapter getServerPrefix(server, "server"), the default prefix mode. */
+function adapterServerPrefix(server: string): string {
+	return Array.from(server, (char) =>
+		/^[A-Za-z0-9_-]$/.test(char) ? char : `_${char.codePointAt(0)!.toString(16)}_`,
+	).join("");
+}
+
+/** pi-mcp-adapter namespaceProxyName/formatServerNamespace (2.36.0); distinct from tool prefixes. */
+function adapterNamespaceProxyName(server: string): string {
+	const normalized = server.replace(/-/g, "_");
+	const safe = /^[A-Za-z0-9_]*$/.test(normalized) && !normalized.startsWith("_mcpns_");
+	const body = safe
+		? normalized
+		: Array.from(normalized, (char) =>
+				char === "_"
+					? "__"
+					: /^[A-Za-z0-9]$/.test(char)
+						? char
+						: `_${char.codePointAt(0)!.toString(16)}_`,
+			).join("");
+	const namespace = safe ? body : `_mcpns_${body}`;
+	// Provider tool names allow 64 characters; the mcp__ prefix consumes five.
+	if (namespace.length <= 59) return `mcp__${namespace}`;
+	const digest = createHash("sha256").update(namespace, "utf8").digest("hex").slice(0, 16);
+	const hashPrefix = "_mcpns__h_";
+	return `mcp__${hashPrefix}${body.slice(0, 59 - hashPrefix.length - digest.length - 1)}_${digest}`;
+}
 
 /** Normalise separators: config says brave-search, models often write brave_search. */
 function normalizeServerToken(value: string): string {
@@ -33,12 +74,14 @@ function normalizeServerToken(value: string): string {
 /** For session_start and tests: server names are learned per session; a new session starts empty. */
 export function resetMcpServerNames(): void {
 	mcpServerNames.clear();
+	mcpServerNamesRevision++;
 }
 
-/** A mounted `mcp__<server>` proxy tool proves the server exists, so learn it on render. */
-function learnMountedMcpServer(toolName: string): void {
-	const proxied = toolName.match(/^mcp[_:-]+(.+)$/i);
-	if (proxied?.[1]) mcpServerNames.add(proxied[1]);
+/** Require matching namespace name/label metadata, not just an MCP-looking call name. */
+export function learnMountedMcpServer(definition: any, toolName: string): void {
+	const label = typeof definition?.label === "string" ? definition.label : "";
+	const server = label.match(/^MCP: (.+)$/)?.[1];
+	if (server && toolName === adapterNamespaceProxyName(server)) rememberMcpServer(server);
 }
 
 /**
@@ -57,7 +100,7 @@ export function learnMcpServerFromResult(
 	if (toolName !== "mcp" || isError) return;
 	if ((result as any)?.details?.error !== undefined) return;
 	const server = (args as any)?.server;
-	if (typeof server === "string" && server) mcpServerNames.add(server);
+	if (typeof server === "string" && server) rememberMcpServer(server);
 }
 
 /**
@@ -68,14 +111,18 @@ export function learnMcpServerFromResult(
 function serverFromMcpToolName(toolName: string): string | undefined {
 	const target = normalizeServerToken(toolName);
 	let best: string | undefined;
+	let bestLength = 0;
 	for (const server of mcpServerNames) {
-		const prefix = normalizeServerToken(server);
-		if (target.startsWith(`${prefix}_`) && (!best || server.length > best.length)) best = server;
+		const prefix = normalizeServerToken(adapterServerPrefix(server));
+		if (target.startsWith(`${prefix}_`) && prefix.length > bestLength) {
+			best = server;
+			bestLength = prefix.length;
+		}
 	}
 	return best;
 }
 
-/** `mcp` gateway: title is the server actually executed; always "MCP" when config.enableMcpGatewayServerName is off. */
+/** `mcp` gateway: requested or inferred target server; always "MCP" when the flag is off. */
 function mcpGatewayTitle(args: unknown): string {
 	if (!config.enableMcpGatewayServerName || !args || typeof args !== "object") return "MCP";
 	const source = args as Record<string, unknown>;
@@ -114,7 +161,7 @@ export function humanizeMcpToolName(toolName: string, label = ""): string {
  * rendered mcp__github as "Mcp Github".
  */
 export function resolveToolTitle(definition: any, toolName: string, args?: unknown): string {
-	learnMountedMcpServer(toolName);
+	learnMountedMcpServer(definition, toolName);
 	if (toolName === "mcp") return mcpGatewayTitle(args);
 	if (isMcpToolDefinition(definition, toolName))
 		return humanizeMcpToolName(toolName, definition?.label);

@@ -13,6 +13,8 @@ import { walkComponentTree } from "../../utils/component-tree.ts";
 import {
 	fitToolCallSummary,
 	learnMcpServerFromResult,
+	learnMountedMcpServer,
+	mcpGatewayTitleRevision,
 	resolveToolTitle,
 	toolCallSummary,
 	type ToolCallSummary,
@@ -152,9 +154,10 @@ function toolDefinition(tool: any): any {
 	return tool?.toolDefinition ?? tool?.builtInToolDefinition;
 }
 
-/** Learn MCP server names from settled children before resolving titles, so the header and child rows agree within one render. */
-function learnFromSettledTools(tools: any[]): void {
+/** Collect all namespace/result evidence first, including native-renderer children, so titles agree within one render. */
+function learnFromTools(tools: any[]): void {
 	for (const tool of tools) {
+		learnMountedMcpServer(toolDefinition(tool), toolName(tool));
 		if (!tool?.result || tool?.isPartial === true) continue;
 		learnMcpServerFromResult(toolName(tool), tool?.args, tool.result, Boolean(tool.result.isError));
 	}
@@ -174,13 +177,13 @@ function toolSummary(tool: any): ToolCallSummary {
 }
 
 /**
- * Header title for a single-tool-name group: reuse the child title when all agree; otherwise
- * (e.g. consecutive mcp gateway calls to github and exa) fall back to the args-independent
- * generic title instead of taking the first child's server.
+ * Reuse the shared child title even across different tool names. Otherwise mixed names use
+ * Multiple Tools, and same-name tools use their generic title (e.g. MCP for mixed servers).
  */
 function groupHeaderLabel(tools: any[]): string {
 	const titles = new Set(tools.map(toolTitle));
 	if (titles.size === 1) return [...titles][0]!;
+	if (new Set(tools.map(toolName)).size > 1) return "Multiple Tools";
 	return resolveToolTitle(toolDefinition(tools[0]), toolName(tools[0]));
 }
 
@@ -200,6 +203,7 @@ type SettledGroupCache = {
 	children: readonly unknown[];
 	args: unknown[];
 	results: unknown[];
+	titleRevision: number;
 	lines: string[];
 };
 
@@ -209,6 +213,7 @@ type ExpandedGroupCache = {
 	theme: unknown;
 	fullscreen: boolean;
 	paints: readonly unknown[];
+	titleRevision: number;
 	lines: string[];
 };
 
@@ -307,7 +312,8 @@ export class ToolGroupComponent extends Container {
 			cache.width !== width ||
 			cache.hover !== this.hintHovered ||
 			cache.theme !== this.patch.theme ||
-			cache.fullscreen !== isToolTuiFullscreen()
+			cache.fullscreen !== isToolTuiFullscreen() ||
+			cache.titleRevision !== mcpGatewayTitleRevision()
 		) {
 			return;
 		}
@@ -336,6 +342,7 @@ export class ToolGroupComponent extends Container {
 			children: [...this.children],
 			args: (this.children as any[]).map((tool) => tool?.args),
 			results: (this.children as any[]).map((tool) => tool?.result),
+			titleRevision: mcpGatewayTitleRevision(),
 			lines,
 		};
 	}
@@ -343,7 +350,7 @@ export class ToolGroupComponent extends Container {
 	render(width: number): string[] {
 		const cached = this.settledCacheHit(width);
 		if (cached) return cached;
-		learnFromSettledTools(this.children);
+		learnFromTools(this.children);
 		const theme = this.patch.theme;
 		const fg = (color: string, text: string) => theme?.fg?.(color, text) ?? text;
 		const counts = { pending: 0, success: 0, error: 0 };
@@ -357,7 +364,7 @@ export class ToolGroupComponent extends Container {
 			})
 			.join(` ${fg("dim", "•")} `);
 		const names = new Set(this.children.map(toolName));
-		const label = names.size === 1 ? groupHeaderLabel(this.children) : "Multiple Tools";
+		const label = groupHeaderLabel(this.children);
 		const overall: ToolStatus = counts.error ? "error" : counts.pending ? "pending" : "success";
 		if (
 			(this.children as any[]).some((tool) => tool?.executionStarted && status(tool) === "pending")
@@ -387,6 +394,7 @@ export class ToolGroupComponent extends Container {
 				expandedHit.hover === this.hintHovered &&
 				expandedHit.theme === this.patch.theme &&
 				expandedHit.fullscreen === isToolTuiFullscreen() &&
+				expandedHit.titleRevision === mcpGatewayTitleRevision() &&
 				expandedHit.paints.length === childPaints.length &&
 				expandedHit.paints.every((paint, index) => paint === childPaints[index])
 			) {
@@ -445,6 +453,7 @@ export class ToolGroupComponent extends Container {
 				theme: this.patch.theme,
 				fullscreen: isToolTuiFullscreen(),
 				paints: childPaints ?? [],
+				titleRevision: mcpGatewayTitleRevision(),
 				lines,
 			};
 		} else if (counts.pending === 0) {

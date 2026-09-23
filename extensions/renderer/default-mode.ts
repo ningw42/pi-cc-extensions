@@ -39,6 +39,7 @@ import { getMessageDisplayTheme } from "./tool/message-display.ts";
 import {
 	fitToolCallSummary,
 	learnMcpServerFromResult,
+	mcpGatewayTitleRevision,
 	resolveToolTitle,
 	toolCallSummary,
 } from "./tool/names.ts";
@@ -71,6 +72,7 @@ type ToolPaintHit = {
 	args: unknown;
 	callHover: boolean;
 	ioHover: string | null;
+	titleRevision: number | undefined;
 	lines: string[];
 };
 
@@ -233,12 +235,15 @@ function createCcstyleTool(
 				visualState === "success"
 					? `${BRIGHT_GREEN}${rawIcon}${ANSI_FG_RESET}`
 					: theme.fg(toolIconColor(context), rawIcon);
-			const summary = toolCallSummary(toolName, args, {
-				// args take part in resolution: the mcp gateway title is the server actually executed.
-				title: resolveToolTitle(originalTool, toolName, args),
-				variant: "default",
-				cwd: context?.cwd,
-			});
+			const summarize = () =>
+				toolCallSummary(toolName, args, {
+					// Gateway titles describe the requested or inferred target, not verified execution.
+					title: resolveToolTitle(originalTool, toolName, args),
+					variant: "default",
+					cwd: context?.cwd,
+				});
+			let titleRevision = gatewayTitleRevision(toolName);
+			let summary = summarize();
 			let writeStatsText = "";
 			let writeStatsStyled = "";
 			if (toolName === "write" && visualState === "success") {
@@ -253,13 +258,21 @@ function createCcstyleTool(
 					writeStatsStyled = ` ${theme.fg("dim", "(")}${theme.fg("success", `+${stats.added}`)} ${theme.fg("error", `-${stats.removed}`)}${theme.fg("dim", ")")}`;
 				}
 			}
-			const extraText = writeStatsText || summary.detail;
-			const extraStyled = writeStatsStyled || theme.fg("dim", summary.detail);
+			let extraText = writeStatsText || summary.detail;
+			let extraStyled = writeStatsStyled || theme.fg("dim", summary.detail);
 			let cachedWidth: number | undefined;
 			let cachedLine: string | undefined;
 			const expanded = Boolean(context?.expanded);
 			return {
 				render(width: number) {
+					const revision = gatewayTitleRevision(toolName);
+					if (revision !== titleRevision) {
+						titleRevision = revision;
+						summary = summarize();
+						extraText = writeStatsText || summary.detail;
+						extraStyled = writeStatsStyled || theme.fg("dim", summary.detail);
+						cachedLine = undefined;
+					}
 					if (cachedLine !== undefined && cachedWidth === width) return [cachedLine];
 					const viewportWidth = toolViewportWidth(width);
 					// 展开态贴左（外层 Box 已 pad 1）；折叠 self-shell 保留 1 格前导空格
@@ -491,8 +504,13 @@ function ioHoverOf(tool: any): string | null {
 	return view.getHoveredSection();
 }
 
+function gatewayTitleRevision(toolName: unknown): number | undefined {
+	return toolName === "mcp" ? mcpGatewayTitleRevision() : undefined;
+}
+
 function toolPaintMatches(hit: ToolPaintHit, tool: any, width: number): boolean {
 	return (
+		hit.titleRevision === gatewayTitleRevision(tool.toolName) &&
 		hit.width === width &&
 		hit.expanded === Boolean(tool.expanded) &&
 		hit.isPartial === Boolean(tool.isPartial) &&
@@ -585,6 +603,7 @@ function installGlobalToolRendering(
 			args: this.args,
 			callHover: isToolCallHovered(this.toolCallId),
 			ioHover: ioHoverOf(this),
+			titleRevision: gatewayTitleRevision(this.toolName),
 			lines,
 		});
 		return lines;
