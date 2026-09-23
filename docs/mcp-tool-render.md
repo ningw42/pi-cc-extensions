@@ -65,7 +65,7 @@ the target is read out of the arguments. That inference is behind a flag.
 
 ```jsonc
 // ~/.pi/agent/pi-cc-extensions.json
-{ "enableMcpServerGuess": true }   // default; /ccstyle → MCP server guess
+{ "enableMcpGatewayServerName": true }   // default; /ccstyle → MCP gateway server name
 ```
 
 ### Rules — `mcp` only

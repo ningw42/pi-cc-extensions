@@ -14,21 +14,21 @@ const GITHUB = { name: "mcp__github", label: "MCP: github" };
 const EXA = { name: "mcp__exa", label: "MCP: exa" };
 const BRAVE = { name: "mcp__brave_search", label: "MCP: brave-search" };
 
-function withGuess<T>(enabled: boolean, run: () => T): T {
-	const previous = config.enableMcpServerGuess;
-	config.enableMcpServerGuess = enabled;
+function withGatewayServerName<T>(enabled: boolean, run: () => T): T {
+	const previous = config.enableMcpGatewayServerName;
+	config.enableMcpGatewayServerName = enabled;
 	resetMcpServerNames();
 	try {
 		return run();
 	} finally {
-		config.enableMcpServerGuess = previous;
+		config.enableMcpGatewayServerName = previous;
 		resetMcpServerNames();
 	}
 }
 
-test("namespace proxies and mcpScript keep the adapter's label, guess flag is irrelevant", () => {
+test("namespace proxies and mcpScript keep the adapter's label, gateway server-name flag is irrelevant", () => {
 	for (const enabled of [true, false]) {
-		withGuess(enabled, () => {
+		withGatewayServerName(enabled, () => {
 			assert.equal(resolveToolTitle(SCRIPT, "mcpScript", { code: "x" }), "MCP Script");
 			assert.equal(resolveToolTitle(GITHUB, "mcp__github", { tool: "github_get_tag" }), "Github");
 			assert.equal(resolveToolTitle(EXA, "mcp__exa", { tool: "get_code_context_exa" }), "Exa");
@@ -37,8 +37,8 @@ test("namespace proxies and mcpScript keep the adapter's label, guess flag is ir
 	}
 });
 
-test("mcp gateway resolves the executing server from args when the guess is on", () => {
-	withGuess(true, () => {
+test("mcp gateway resolves the executing server from args when the flag is on", () => {
+	withGatewayServerName(true, () => {
 		// args.server is authoritative
 		assert.equal(
 			resolveToolTitle(GATEWAY, "mcp", { server: "github", tool: "get_file_contents" }),
@@ -64,7 +64,7 @@ test("mcp gateway resolves the executing server from args when the guess is on",
 });
 
 test("mcp gateway falls back to MCP rather than inventing a server", () => {
-	withGuess(true, () => {
+	withGatewayServerName(true, () => {
 		// unprefixed tool name the adapter never registered -> no server is recoverable.
 		// Must not degrade to the first token ("Get").
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "get_file_contents" }), "MCP");
@@ -74,7 +74,7 @@ test("mcp gateway falls back to MCP rather than inventing a server", () => {
 });
 
 test("args.server is learned only from calls that settled without an adapter error", () => {
-	withGuess(true, () => {
+	withGatewayServerName(true, () => {
 		const unknown = { server: "get", tool: "get_file_contents" };
 		// the call still titles itself from its own args.server...
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", unknown), "Get");
@@ -96,8 +96,8 @@ test("args.server is learned only from calls that settled without an adapter err
 	});
 });
 
-test("enableMcpServerGuess=false pins the gateway to plain MCP", () => {
-	withGuess(false, () => {
+test("enableMcpGatewayServerName=false pins the gateway to plain MCP", () => {
+	withGatewayServerName(false, () => {
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "MCP");
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { server: "github", tool: "x" }), "MCP");
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { search: "x", server: "github" }), "MCP");
@@ -105,7 +105,7 @@ test("enableMcpServerGuess=false pins the gateway to plain MCP", () => {
 });
 
 test("server names are learned from mcp__<server> mounts", () => {
-	withGuess(true, () => {
+	withGatewayServerName(true, () => {
 		// nothing learned yet: the prefix cannot be resolved
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "MCP");
 		// rendering the namespace proxy teaches us the server name
@@ -115,7 +115,7 @@ test("server names are learned from mcp__<server> mounts", () => {
 });
 
 test("non-MCP tools are unaffected by the shared resolver", () => {
-	withGuess(true, () => {
+	withGatewayServerName(true, () => {
 		assert.equal(resolveToolTitle({ name: "bash" }, "bash", { command: "ls" }), "Bash");
 		assert.equal(resolveToolTitle({ name: "read" }, "read", { path: "a.ts" }), "Read");
 		assert.equal(resolveToolTitle({ name: "TaskCreate" }, "TaskCreate", {}), "Task Create");

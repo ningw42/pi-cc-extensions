@@ -69,7 +69,7 @@ export type Config = {
 	enableAgentSummary: boolean;
 	enableWorkingMessage: boolean;
 	enableAliases: boolean;
-	enableMcpServerGuess: boolean;
+	enableMcpGatewayServerName: boolean;
 	enableCustomFooter: boolean;
 	footerNerdIcons: boolean;
 	footerHiddenKeys: string[];
@@ -142,7 +142,7 @@ export const DEFAULT_CONFIG: Config = {
 	 * Whether pi-mcp-adapter `mcp` gateway call titles infer the target server.
 	 * When off, the gateway always shows "MCP"; `mcp__<server>` proxy tools are unaffected.
 	 */
-	enableMcpServerGuess: true,
+	enableMcpGatewayServerName: true,
 	enableCustomFooter: true,
 	footerNerdIcons: true,
 	...DEFAULT_FOOTER_CHIP_LAYOUT,
@@ -244,7 +244,7 @@ export function normalizeConfig(input: unknown): Config {
 		enableAgentSummary: source.enableAgentSummary !== false,
 		enableWorkingMessage: source.enableWorkingMessage !== false,
 		enableAliases: source.enableAliases !== false,
-		enableMcpServerGuess: source.enableMcpServerGuess !== false,
+		enableMcpGatewayServerName: source.enableMcpGatewayServerName !== false,
 		enableCustomFooter: source.enableCustomFooter !== false,
 		footerNerdIcons: source.footerNerdIcons !== false,
 		...normalizeFooterChipLayout(source),
@@ -301,7 +301,7 @@ export function formatConfigStatus(source: Config = config): string {
 		`agentSummary=${source.enableAgentSummary ? "on" : "off"}`,
 		`workingMsg=${source.enableWorkingMessage ? "on" : "off"}`,
 		`aliases=${source.enableAliases ? "on" : "off"}`,
-		`mcpGuess=${source.enableMcpServerGuess ? "on" : "off"}`,
+		`mcpGatewayServer=${source.enableMcpGatewayServerName ? "on" : "off"}`,
 		`footer=${source.enableCustomFooter ? "on" : "off"}`,
 		`footerIcons=${source.footerNerdIcons ? "nerd" : "plain"}`,
 		formatFooterChipSummary(source),

@@ -546,12 +546,12 @@ export async function showCcstylePanel(
 		};
 
 		// Read at render time: toggling refreshes the current transcript and applies immediately, bypassing restart-based featureToggles.
-		const mcpServerGuessToggle = featureToggleSetting(
-			"enableMcpServerGuess",
-			"MCP server guess",
+		const mcpGatewayServerNameToggle = featureToggleSetting(
+			"enableMcpGatewayServerName",
+			"MCP gateway server name",
 			"mcp gateway calls show the target server (github, exa, ...).",
 			"mcp gateway calls always show plain MCP.",
-			config.enableMcpServerGuess,
+			config.enableMcpGatewayServerName,
 		);
 
 		// 额外功能开关：注册于扩展加载期，切换后需重启（/reload）生效。
@@ -666,10 +666,10 @@ export async function showCcstylePanel(
 				ctx.ui.notify(`Updated ${id}: ${value}`, "info");
 				return;
 			}
-			if (id === "enableMcpServerGuess") {
+			if (id === "enableMcpGatewayServerName") {
 				const enabled = value === "on";
-				updateConfig({ enableMcpServerGuess: enabled });
-				mcpServerGuessToggle.apply(enabled);
+				updateConfig({ enableMcpGatewayServerName: enabled });
+				mcpGatewayServerNameToggle.apply(enabled);
 				hooks.refreshCurrentTranscript(ctx);
 				ctx.ui.notify(`Updated ${id}: ${value}`, "info");
 				return;
@@ -823,7 +823,7 @@ export async function showCcstylePanel(
 			{
 				id: "style",
 				label: "Style",
-				items: [modeSetting, excludeSetting, mcpServerGuessToggle.setting],
+				items: [modeSetting, excludeSetting, mcpGatewayServerNameToggle.setting],
 			},
 			{
 				id: "feature",

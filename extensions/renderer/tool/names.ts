@@ -75,9 +75,9 @@ function serverFromMcpToolName(toolName: string): string | undefined {
 	return best;
 }
 
-/** `mcp` gateway: title is the server actually executed; always "MCP" when config.enableMcpServerGuess is off. */
+/** `mcp` gateway: title is the server actually executed; always "MCP" when config.enableMcpGatewayServerName is off. */
 function mcpGatewayTitle(args: unknown): string {
-	if (!config.enableMcpServerGuess || !args || typeof args !== "object") return "MCP";
+	if (!config.enableMcpGatewayServerName || !args || typeof args !== "object") return "MCP";
 	const source = args as Record<string, unknown>;
 	const server = typeof source.server === "string" && source.server ? source.server : "";
 	const tool = typeof source.tool === "string" ? source.tool : "";
