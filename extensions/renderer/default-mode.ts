@@ -36,7 +36,12 @@ import { showMoreHintText } from "./tool/show-more-hint.ts";
 import { countWriteDiffStats } from "./tool/diff/diff-renderer.ts";
 import { renderRichToolResult, type WriteExecutionMetadataStore } from "./tool/diff/index.ts";
 import { getMessageDisplayTheme } from "./tool/message-display.ts";
-import { fitToolCallSummary, resolveToolTitle, toolCallSummary } from "./tool/names.ts";
+import {
+	fitToolCallSummary,
+	learnMcpServerFromResult,
+	resolveToolTitle,
+	toolCallSummary,
+} from "./tool/names.ts";
 
 // 成功勾：亮绿 truecolor（与 message-display 一致）
 const BRIGHT_GREEN = "\x1b[38;2;80;220;100m";
@@ -103,7 +108,7 @@ export function shouldRenderRichDiff(
 }
 
 // MCP 标题解析收敛在 names.ts（单工具卡与分组卡共用）；此处保留导出路径不变。
-export { humanizeMcpToolName, isMcpToolDefinition, resolveToolTitle } from "./tool/names.ts";
+export { humanizeMcpToolName, isMcpToolDefinition } from "./tool/names.ts";
 
 /** 排除名单内且自带 renderer 的工具保留原渲染。 */
 export function preservesOriginalRenderer(
@@ -273,6 +278,10 @@ function createCcstyleTool(
 			};
 		},
 		renderResult(result: any, options: any, theme: any, context: any) {
+			if (!options?.isPartial && !context?.isPartial) {
+				const isError = Boolean(options?.isError || context?.isError);
+				learnMcpServerFromResult(toolName, context?.args, result, isError);
+			}
 			if (config.mode !== "on") {
 				return renderDefault(
 					originalTool,

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { config } from "../extensions/config/config.ts";
-import { resetMcpServerNames, resolveToolTitle } from "../extensions/renderer/tool/names.ts";
+import {
+	learnMcpServerFromResult,
+	resetMcpServerNames,
+	resolveToolTitle,
+} from "../extensions/renderer/tool/names.ts";
 
 /** pi-mcp-adapter 实际注册的定义（index.ts / namespace-tools.ts）。 */
 const GATEWAY = { name: "mcp", label: "MCP" };
@@ -40,7 +44,9 @@ test("mcp gateway resolves the executing server from args when the guess is on",
 			resolveToolTitle(GATEWAY, "mcp", { server: "github", tool: "get_file_contents" }),
 			"Github",
 		);
-		// server recovered from the tool-name prefix formatToolName() built
+		// a successful call naming the server teaches the pool...
+		learnMcpServerFromResult("mcp", { server: "github", tool: "get_me" }, { content: [] }, false);
+		// ...so the server is recovered from the tool-name prefix formatToolName() built
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "Github");
 		// separators normalised: configured brave-search vs model-written brave_search.
 		// The server must be known first — here from the namespace proxy mount.
@@ -67,6 +73,29 @@ test("mcp gateway falls back to MCP rather than inventing a server", () => {
 	});
 });
 
+test("args.server is learned only from calls that settled without an adapter error", () => {
+	withGuess(true, () => {
+		const unknown = { server: "get", tool: "get_file_contents" };
+		// the call still titles itself from its own args.server...
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", unknown), "Get");
+		// ...and rendering the call alone never teaches the pool
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "get_file_contents" }), "MCP");
+		// pi-mcp-adapter returns server_not_found as a normal result: isError=false, details.error set
+		const notFound = { content: [], details: { error: "server_not_found", server: "get" } };
+		learnMcpServerFromResult("mcp", unknown, notFound, false);
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "get_file_contents" }), "MCP");
+		// a thrown/flagged failure is not learned either
+		learnMcpServerFromResult("mcp", unknown, { content: [] }, true);
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "get_file_contents" }), "MCP");
+		// non-gateway tools never teach from args.server
+		learnMcpServerFromResult("mcpScript", { server: "github" }, { content: [] }, false);
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "MCP");
+		// a successful server-only call does
+		learnMcpServerFromResult("mcp", { server: "github", search: "x" }, { content: [] }, false);
+		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "Github");
+	});
+});
+
 test("enableMcpServerGuess=false pins the gateway to plain MCP", () => {
 	withGuess(false, () => {
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "MCP");
@@ -75,7 +104,7 @@ test("enableMcpServerGuess=false pins the gateway to plain MCP", () => {
 	});
 });
 
-test("server names are learned from mcp__<server> mounts, not just args.server", () => {
+test("server names are learned from mcp__<server> mounts", () => {
 	withGuess(true, () => {
 		// nothing learned yet: the prefix cannot be resolved
 		assert.equal(resolveToolTitle(GATEWAY, "mcp", { tool: "github_search_code" }), "MCP");

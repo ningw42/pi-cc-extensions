@@ -33,6 +33,7 @@ import {
 import { getToolMouseTui } from "./mouse/scroll.ts";
 import { setHoveredToolGroup, setHoveredToolIo } from "./mouse/hover.ts";
 import { clearAllAnimations } from "./tool/result.ts";
+import { resetMcpServerNames } from "./tool/names.ts";
 import { installWriteOverride, WriteExecutionMetadataStore } from "./tool/diff/index.ts";
 import {
 	installMessageDisplayRendering,
@@ -199,6 +200,8 @@ export default function (
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		// MCP server 名按会话学习：/new、/resume 不能沿用上一会话的名池。
+		resetMcpServerNames();
 		// 延迟到 session_start 注册 write override：加载阶段 getAllTools 不可用且其他扩展
 		// 尚未注册工具，无法检测外部 write 所有者（如 pi-spark），直接注册会与对方撞名。
 		// session_start 时所有扩展已加载完毕，installWriteOverride 内部会检测并让位。

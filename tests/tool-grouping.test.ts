@@ -9,6 +9,7 @@ import {
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Container, Spacer } from "@earendil-works/pi-tui";
 import { installToolGrouping, ToolGroupComponent } from "../extensions/renderer/tool/grouping.ts";
+import { resetMcpServerNames } from "../extensions/renderer/tool/names.ts";
 
 initTheme("dark");
 const ui = { theme: { fg: (_color: string, text: string) => text }, requestRender() {} } as any;
@@ -220,6 +221,45 @@ test("external task, skill, and plan tools keep reference summaries in groups", 
 		assert.equal(agentLines[2], " └ ✓ Get Subagent Result 6a559462-95d0-40b");
 	} finally {
 		hooks.shutdown();
+	}
+});
+
+function mcpTool(name: string, label: string, id: string, args: any) {
+	const definition = { name, label, description: "", parameters: {} } as any;
+	const component = new ToolExecutionComponent(name, id, args, {}, definition, ui, process.cwd());
+	(component as any).updateResult({ content: [], isError: false });
+	return component as any;
+}
+
+test("MCP groups use the single-card title for the header and child rows", () => {
+	const hooks = installToolGrouping(() => true);
+	resetMcpServerNames();
+	try {
+		const parent = new Container() as any;
+		parent.addChild(mcpTool("mcp__github", "MCP: github", "gh-1", { tool: "get_me" }));
+		parent.addChild(mcpTool("mcp__github", "MCP: github", "gh-2", { tool: "get_tag" }));
+		const rendered = (parent.children[0] as ToolGroupComponent).render(200).join("\n");
+		assert.doesNotMatch(rendered, /Mcp Github/);
+		assert.match(rendered, /● Github: 2 done/, "header uses the adapter label");
+	} finally {
+		hooks.shutdown();
+		resetMcpServerNames();
+	}
+});
+
+test("MCP gateway groups spanning several servers fall back to a generic header", () => {
+	const hooks = installToolGrouping(() => true);
+	resetMcpServerNames();
+	try {
+		const parent = new Container() as any;
+		parent.addChild(mcpTool("mcp", "MCP", "gw-1", { server: "github", tool: "github_get_me" }));
+		parent.addChild(mcpTool("mcp", "MCP", "gw-2", { server: "exa", tool: "exa_search" }));
+		const rendered = (parent.children[0] as ToolGroupComponent).render(200).join("\n");
+		assert.match(rendered, /● MCP: 2 done/);
+		assert.doesNotMatch(rendered, /● (Github|Exa):/);
+	} finally {
+		hooks.shutdown();
+		resetMcpServerNames();
 	}
 });
 

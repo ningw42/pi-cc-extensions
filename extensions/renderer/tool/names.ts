@@ -30,15 +30,31 @@ function normalizeServerToken(value: string): string {
 	return value.toLowerCase().replace(/-/g, "_");
 }
 
-/** 测试与 /reload 用：清空已学习的 server 名。 */
+/** session_start 与测试用：server 名按会话学习，新会话从空池开始。 */
 export function resetMcpServerNames(): void {
 	mcpServerNames.clear();
 }
 
-/** 从一次调用里学习 server 名，供后续缺少 server 参数的网关调用反查。 */
-function learnMcpServerNames(toolName: string, args: unknown): void {
+/** `mcp__<server>` 代理工具已挂载即说明 server 真实存在，渲染时直接学习。 */
+function learnMountedMcpServer(toolName: string): void {
 	const proxied = toolName.match(/^mcp[_:-]+(.+)$/i);
 	if (proxied?.[1]) mcpServerNames.add(proxied[1]);
+}
+
+/**
+ * 网关调用成功后才学习 `args.server`：模型写错的 server（如
+ * `{ server: "get", tool: "get_file_contents" }`）入池后会让“首段即 server”的误判复活。
+ * pi-mcp-adapter 把 server_not_found 等失败作为普通结果返回（isError 为 false），
+ * 只在 `details.error` 上标记，因此两者都要检查。
+ */
+export function learnMcpServerFromResult(
+	toolName: string,
+	args: unknown,
+	result: unknown,
+	isError: boolean,
+): void {
+	if (toolName !== "mcp" || isError) return;
+	if ((result as any)?.details?.error !== undefined) return;
 	const server = (args as any)?.server;
 	if (typeof server === "string" && server) mcpServerNames.add(server);
 }
@@ -95,7 +111,7 @@ export function humanizeMcpToolName(toolName: string, label = ""): string {
  * 分组卡此前只有 humanizeToolLabel(toolName)，会把 mcp__github 渲染成 "Mcp Github"。
  */
 export function resolveToolTitle(definition: any, toolName: string, args?: unknown): string {
-	learnMcpServerNames(toolName, args);
+	learnMountedMcpServer(toolName);
 	if (toolName === "mcp") return mcpGatewayTitle(args);
 	if (isMcpToolDefinition(definition, toolName))
 		return humanizeMcpToolName(toolName, definition?.label);

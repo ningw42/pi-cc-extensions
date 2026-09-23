@@ -81,13 +81,19 @@ the target is read out of the arguments. That inference is behind a flag.
 Rule 1's recovery inverts the adapter's `formatToolName`, which builds `${serverPrefix}_${tool}`:
 match the **longest known server prefix**, comparing with `-` and `_` normalised (configured
 `brave-search` vs model-written `brave_search`). Server names are learned during the session from
-`args.server` values and from `mcp__<server>` mounts — ccstyle cannot read `mcp.json`.
+`mcp__<server>` mounts, and from `args.server` only once that gateway call has **settled without
+error** — ccstyle cannot read `mcp.json`. "Without error" means both `isError` is false and the
+result carries no `details.error`: pi-mcp-adapter returns `server_not_found`, `tool_not_found`,
+`auth_required` etc. as ordinary results tagged only by `details.error`. A made-up server
+(`{ server: "get", tool: "get_file_contents" }`) still titles its own call but is never learned;
+otherwise it would reintroduce the first-token guess ruled out below.
 
 When the flag is off, every gateway call renders `MCP`.
 
 ### Coverage
 
-Measured over 1489 real `mcp` calls:
+Measured over 1489 real `mcp` calls, before learning was restricted to successful calls (so the
+730 is an upper bound):
 
 ```text
   267  rule 1 — args.server present
@@ -109,5 +115,11 @@ The 5 unrecoverable calls all used a tool name the adapter never registered
 `Tool "..." not found`. There is deliberately **no** "first token before `_`" fallback: it would
 render `get_file_contents` as the server `Get`, which does not exist. Degrading to `MCP` is honest.
 
-Server learning is per-session and starts empty, so a gateway call that omits `server` before any
-call has named that server falls back to `MCP` and self-corrects afterwards.
+Server learning is per-session: the pool is cleared on every `session_start` (`/new`, `/resume`).
+A gateway call that omits `server` before that server has been learned falls back to `MCP` and
+self-corrects on the next re-render.
+
+A group header uses the children's shared title; a run of gateway calls to different servers
+(github then exa) is headed `MCP` rather than the first child's server.
+
+The flag lives under `/ccstyle` → Style and applies on the next render — no restart.

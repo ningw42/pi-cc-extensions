@@ -200,7 +200,7 @@ function diffIndicatorDescription(mode: DiffIndicatorMode): string {
 	return "Vertical bar indicators on changed lines (default).";
 }
 
-/** 额外功能开关项：on/off 二值，描述随状态切换；切换后需重启生效。 */
+/** on/off 开关项：描述随状态切换。是否需重启由调用方的 onSettingChange 分支决定。 */
 function featureToggleSetting(
 	id: string,
 	label: string,
@@ -545,6 +545,15 @@ export async function showCcstylePanel(
 				buildNumberInputSubmenu(theme, scrollStepSetting, closeSubmenu),
 		};
 
+		// 渲染期读取的开关：切换后刷新当前 transcript 即时生效，不走重启型 featureToggles。
+		const mcpServerGuessToggle = featureToggleSetting(
+			"enableMcpServerGuess",
+			"MCP server guess",
+			"mcp gateway calls show the target server (github, exa, ...).",
+			"mcp gateway calls always show plain MCP.",
+			config.enableMcpServerGuess,
+		);
+
 		// 额外功能开关：注册于扩展加载期，切换后需重启（/reload）生效。
 		const sessionReferenceToggle = featureToggleSetting(
 			"enableSessionReference",
@@ -587,13 +596,6 @@ export async function showCcstylePanel(
 			"/clear and /exit aliases enabled. Next restart applies.",
 			"Aliases disabled.",
 			config.enableAliases,
-		);
-		const mcpServerGuessToggle = featureToggleSetting(
-			"enableMcpServerGuess",
-			"MCP server guess",
-			"mcp gateway calls show the target server (github, exa, ...).",
-			"mcp gateway calls always show plain MCP.",
-			config.enableMcpServerGuess,
 		);
 		const footerNerdIconsSetting = {
 			id: "footerNerdIcons",
@@ -641,7 +643,6 @@ export async function showCcstylePanel(
 			enableAgentSummary: agentSummaryToggle,
 			enableWorkingMessage: workingMessageToggle,
 			enableAliases: aliasesToggle,
-			enableMcpServerGuess: mcpServerGuessToggle,
 		};
 
 		const onSettingChange = (id: string, value: string) => {
@@ -662,6 +663,14 @@ export async function showCcstylePanel(
 				footerNerdIconsSetting.description = enabled
 					? "Git and cache chips use Nerd Font glyphs. Turn off for plain text."
 					: "Git and cache chips use plain text. No Nerd Font required.";
+				ctx.ui.notify(`Updated ${id}: ${value}`, "info");
+				return;
+			}
+			if (id === "enableMcpServerGuess") {
+				const enabled = value === "on";
+				updateConfig({ enableMcpServerGuess: enabled });
+				mcpServerGuessToggle.apply(enabled);
+				hooks.refreshCurrentTranscript(ctx);
 				ctx.ui.notify(`Updated ${id}: ${value}`, "info");
 				return;
 			}
@@ -814,7 +823,7 @@ export async function showCcstylePanel(
 			{
 				id: "style",
 				label: "Style",
-				items: [modeSetting, excludeSetting],
+				items: [modeSetting, excludeSetting, mcpServerGuessToggle.setting],
 			},
 			{
 				id: "feature",
@@ -826,7 +835,6 @@ export async function showCcstylePanel(
 					agentSummaryToggle.setting,
 					workingMessageToggle.setting,
 					aliasesToggle.setting,
-					mcpServerGuessToggle.setting,
 				],
 			},
 			{
