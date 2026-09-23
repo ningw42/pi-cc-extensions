@@ -7,7 +7,7 @@ import {
 	resolveToolTitle,
 } from "../extensions/renderer/tool/names.ts";
 
-/** pi-mcp-adapter 实际注册的定义（index.ts / namespace-tools.ts）。 */
+/** Definitions pi-mcp-adapter actually registers (index.ts / namespace-tools.ts). */
 const GATEWAY = { name: "mcp", label: "MCP" };
 const SCRIPT = { name: "mcpScript", label: "MCP Script" };
 const GITHUB = { name: "mcp__github", label: "MCP: github" };

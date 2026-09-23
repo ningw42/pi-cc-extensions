@@ -200,7 +200,7 @@ function diffIndicatorDescription(mode: DiffIndicatorMode): string {
 	return "Vertical bar indicators on changed lines (default).";
 }
 
-/** on/off 开关项：描述随状态切换。是否需重启由调用方的 onSettingChange 分支决定。 */
+/** 开关项：on/off 二值，描述随状态切换；是否需重启由调用方决定。 */
 function featureToggleSetting(
 	id: string,
 	label: string,
@@ -545,7 +545,7 @@ export async function showCcstylePanel(
 				buildNumberInputSubmenu(theme, scrollStepSetting, closeSubmenu),
 		};
 
-		// 渲染期读取的开关：切换后刷新当前 transcript 即时生效，不走重启型 featureToggles。
+		// Read at render time: toggling refreshes the current transcript and applies immediately, bypassing restart-based featureToggles.
 		const mcpServerGuessToggle = featureToggleSetting(
 			"enableMcpServerGuess",
 			"MCP server guess",

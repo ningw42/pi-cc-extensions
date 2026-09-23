@@ -139,8 +139,8 @@ export const DEFAULT_CONFIG: Config = {
 	enableWorkingMessage: true,
 	enableAliases: true,
 	/**
-	 * pi-mcp-adapter 的 `mcp` 网关调用标题是否推断执行目标的 server。
-	 * 关闭后网关一律显示 "MCP"；`mcp__<server>` 代理工具不受影响。
+	 * Whether pi-mcp-adapter `mcp` gateway call titles infer the target server.
+	 * When off, the gateway always shows "MCP"; `mcp__<server>` proxy tools are unaffected.
 	 */
 	enableMcpServerGuess: true,
 	enableCustomFooter: true,

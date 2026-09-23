@@ -107,7 +107,7 @@ export function shouldRenderRichDiff(
 	return mode === "on" && !isError && (toolName === "edit" || toolName === "write");
 }
 
-// MCP 标题解析收敛在 names.ts（单工具卡与分组卡共用）；此处保留导出路径不变。
+// MCP title resolution lives in names.ts (shared by single and group cards); re-exported here to keep the import path.
 export { humanizeMcpToolName, isMcpToolDefinition } from "./tool/names.ts";
 
 /** 排除名单内且自带 renderer 的工具保留原渲染。 */
@@ -234,7 +234,7 @@ function createCcstyleTool(
 					? `${BRIGHT_GREEN}${rawIcon}${ANSI_FG_RESET}`
 					: theme.fg(toolIconColor(context), rawIcon);
 			const summary = toolCallSummary(toolName, args, {
-				// args 参与解析：mcp 网关的标题取自实际执行目标的 server。
+				// args take part in resolution: the mcp gateway title is the server actually executed.
 				title: resolveToolTitle(originalTool, toolName, args),
 				variant: "default",
 				cwd: context?.cwd,

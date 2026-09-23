@@ -200,7 +200,7 @@ export default function (
 	});
 
 	pi.on("session_start", async (event, ctx) => {
-		// MCP server 名按会话学习：/new、/resume 不能沿用上一会话的名池。
+		// MCP server names are learned per session: /new and /resume must not inherit the previous pool.
 		resetMcpServerNames();
 		// 延迟到 session_start 注册 write override：加载阶段 getAllTools 不可用且其他扩展
 		// 尚未注册工具，无法检测外部 write 所有者（如 pi-spark），直接注册会与对方撞名。

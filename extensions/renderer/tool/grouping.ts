@@ -152,7 +152,7 @@ function toolDefinition(tool: any): any {
 	return tool?.toolDefinition ?? tool?.builtInToolDefinition;
 }
 
-/** 先从已结束的子项学习 MCP server 名，再解析标题，保证同一次渲染的头部与子行一致。 */
+/** Learn MCP server names from settled children before resolving titles, so the header and child rows agree within one render. */
 function learnFromSettledTools(tools: any[]): void {
 	for (const tool of tools) {
 		if (!tool?.result || tool?.isPartial === true) continue;
@@ -160,7 +160,7 @@ function learnFromSettledTools(tools: any[]): void {
 	}
 }
 
-/** 与单工具卡共用标题解析，否则 mcp__github 在组里会退化成 "Mcp Github"。 */
+/** Share title resolution with single tool cards; otherwise mcp__github degrades to "Mcp Github" in groups. */
 function toolTitle(tool: any): string {
 	return resolveToolTitle(toolDefinition(tool), toolName(tool), tool?.args ?? {});
 }
@@ -174,8 +174,9 @@ function toolSummary(tool: any): ToolCallSummary {
 }
 
 /**
- * 单一工具名分组的头部标题：子行标题一致时沿用；不一致时（如 mcp 网关连续调用
- * github 与 exa）退回不看参数的通用标题，而不是取第一个子项的 server。
+ * Header title for a single-tool-name group: reuse the child title when all agree; otherwise
+ * (e.g. consecutive mcp gateway calls to github and exa) fall back to the args-independent
+ * generic title instead of taking the first child's server.
  */
 function groupHeaderLabel(tools: any[]): string {
 	const titles = new Set(tools.map(toolTitle));
